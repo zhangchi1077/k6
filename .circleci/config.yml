@@ -16,14 +16,6 @@ jobs:
             curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
             dep status
             dep ensure -update -dry-run
-      - run:
-          name: Run linter
-          command: |
-            export PATH=$GOPATH/bin:$PATH
-            go get -t ./...
-            go get -u github.com/alecthomas/gometalinter
-            gometalinter --install
-            gometalinter --deadline 10m --config gometalinter.json --vendor ./...
 
   test:
     docker:
@@ -45,22 +37,6 @@ jobs:
             grep -h -v "^mode:" *.coverage >> coverage.txt
             rm -f *.coverage
             bash <(curl -s https://codecov.io/bash)
-
-
-  test-go110:
-    docker:
-      - image: circleci/golang:1.10.8
-    environment:
-      GOPATH: /home/circleci/.go_workspace
-    working_directory: /home/circleci/.go_workspace/src/github.com/loadimpact/k6
-    steps:
-      - checkout
-      - run:
-          name: Run tests and code coverage
-          command: |
-            export GOMAXPROCS=2
-            export PATH=$GOPATH/bin:$PATH
-            go test -race -timeout 600s ./...
 
   test-go112:
     docker:
@@ -173,10 +149,6 @@ workflows:
             tags:
               only: /.*/
       - test:
-          filters:
-            tags:
-              only: /.*/
-      - test-go110:
           filters:
             tags:
               only: /.*/
