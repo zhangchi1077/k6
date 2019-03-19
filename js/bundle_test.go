@@ -23,6 +23,7 @@ package js
 import (
 	"crypto/tls"
 	"fmt"
+	"runtime"
 	"testing"
 	"time"
 
@@ -406,6 +407,10 @@ func TestNewBundleFromArchive(t *testing.T) {
 
 func TestOpen(t *testing.T) {
 	t.Run("paths", func(t *testing.T) {
+		var fullpathPrefix = ""
+		if runtime.GOOS == "windows" {
+			fullpathPrefix = "C:"
+		}
 		var testCases = [...]struct {
 			name           string
 			openPath       string
@@ -435,22 +440,22 @@ func TestOpen(t *testing.T) {
 			},
 			{
 				name:     "fullpath",
-				openPath: "/path/to/file.txt",
+				openPath: fullpathPrefix + "/path/to/file.txt",
 				pwd:      "/path/to",
 			},
 			{
 				name:     "fullpath2",
-				openPath: "/path/to/file.txt",
+				openPath: fullpathPrefix + "/path/to/file.txt",
 				pwd:      "/path",
 			},
 			{
 				name:     "file is dir",
-				openPath: "/path/to/",
+				openPath: fullpathPrefix + "/path/to/",
 				isError:  true,
 			},
 			{
 				name:     "file is missing",
-				openPath: "/path/to/missing.txt",
+				openPath: fullpathPrefix + "/path/to/missing.txt",
 				isError:  true,
 			},
 		}
