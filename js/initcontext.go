@@ -166,10 +166,13 @@ func (i *InitContext) compileImport(src, filename string) (*goja.Program, error)
 
 func (i *InitContext) Open(name string, args ...string) (goja.Value, error) {
 	filename := name
+	println("open before:" + filename)
 	if filename[0] != '/' && filename[0] != filepath.Separator && !filepath.IsAbs(filename) {
 		filename = filepath.Join(i.pwd, filename)
 	}
+	println("open after :" + filename)
 	filename = filepath.ToSlash(filename)
+	println("open after/:" + filename)
 
 	data, ok := i.files[filename]
 	if !ok {
