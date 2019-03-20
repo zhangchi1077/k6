@@ -485,11 +485,12 @@ func TestOpen(t *testing.T) {
 			for _, tCase := range testCases {
 				tCase := tCase
 				var openPath = tCase.openPath
-				println(openPath)
+				println("before: " + openPath)
 				// if fullpath prepend prefix
 				if openPath[0] == '/' {
 					openPath = filepath.Join(prefix, openPath)
 				}
+				println("after:  " + openPath)
 
 				t.Run(tCase.name, func(t *testing.T) {
 					src := &lib.SourceData{
