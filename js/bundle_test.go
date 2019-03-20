@@ -26,9 +26,11 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
@@ -602,4 +604,45 @@ func TestBundleEnv(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestWindows(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip()
+	}
+	prefix, err := ioutil.TempDir("", "test")
+	require.NoError(t, err)
+	fs := afero.NewOsFs()
+	afero.WriteFile(fs, filepath.Join(prefix, "test.text"), []byte("hi"), 0644)
+	src := &lib.SourceData{
+		Filename: filepath.Join(prefix, prefix+"/to/script.js"),
+		Data: []byte(`
+			export let file = open("..\test.txt");
+			export default function() { return file };
+		`),
+	}
+	spew.Dump(src.Data)
+	sourceBundle, err := NewBundle(src, fs, lib.RuntimeOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+	arcBundle, err := NewBundleFromArchive(sourceBundle.makeArchive(), lib.RuntimeOptions{})
+	if !assert.NoError(t, err) {
+		return
+	}
+	for source, b := range map[string]*Bundle{"source": sourceBundle, "archive": arcBundle} {
+		b := b
+		t.Run(source, func(t *testing.T) {
+			bi, err := b.Instantiate()
+			if !assert.NoError(t, err) {
+				return
+			}
+			v, err := bi.Default(goja.Undefined())
+			if !assert.NoError(t, err) {
+				return
+			}
+			assert.Equal(t, "hi", v.Export())
+		})
+	}
+
 }
