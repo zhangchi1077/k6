@@ -488,7 +488,7 @@ func TestOpen(t *testing.T) {
 				println("before: " + openPath)
 				// if fullpath prepend prefix
 				if openPath[0] == '/' {
-					openPath = filepath.Join(prefix, openPath)
+					openPath = filepath.ToSlash(filepath.Join(prefix, openPath))
 				}
 				println("after:  " + openPath)
 
