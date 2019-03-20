@@ -25,7 +25,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/compiler"
@@ -167,14 +166,10 @@ func (i *InitContext) compileImport(src, filename string) (*goja.Program, error)
 
 func (i *InitContext) Open(name string, args ...string) (goja.Value, error) {
 	filename := name
-	spew.Dump("name=" + name)
 	if filename[0] != '/' && filename[0] != filepath.Separator && !filepath.IsAbs(filename) {
-		spew.Dump("filename before= " + filename)
 		filename = filepath.Join(i.pwd, filename)
 	}
-	spew.Dump("filename after= " + filename)
 	filename = filepath.ToSlash(filename)
-	spew.Dump("filename final= " + filename)
 
 	data, ok := i.files[filename]
 	if !ok {
