@@ -612,8 +612,9 @@ func TestWindows(t *testing.T) {
 	}
 	prefix, err := ioutil.TempDir("", "test")
 	require.NoError(t, err)
+	defer os.RemoveAll(prefix)
 	fs := afero.NewOsFs()
-	afero.WriteFile(fs, filepath.Join(prefix, "test.text"), []byte("hi"), 0644)
+	afero.WriteFile(fs, filepath.Join(prefix, "test.txt"), []byte("hi"), 0644)
 	src := &lib.SourceData{
 		Filename: filepath.Join(prefix, "/to/script.js"),
 		Data: []byte(`
