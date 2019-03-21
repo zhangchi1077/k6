@@ -493,8 +493,9 @@ func TestOpen(t *testing.T) {
 					openPath = filepath.Join(prefix, openPath)
 				}
 				if runtime.GOOS == "windows" {
-					strings.Replace(openPath, `\`, `\\`, 100000)
+					strings.Replace(openPath, "\\", "\\\\", -1)
 				}
+				spew.Dump(openPath)
 
 				t.Run(tCase.name, func(t *testing.T) {
 					src := &lib.SourceData{
