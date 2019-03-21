@@ -498,7 +498,7 @@ func TestOpen(t *testing.T) {
 				spew.Dump(openPath)
 
 				t.Run(tCase.name, func(t *testing.T) {
-					script = fmt.Sprintf(`
+					var script = fmt.Sprintf(`
 			export let file = open("%s");
 			export default function() { return file };
 		`, openPath)
