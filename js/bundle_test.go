@@ -500,10 +500,10 @@ func TestOpen(t *testing.T) {
 				t.Run(tCase.name, func(t *testing.T) {
 					src := &lib.SourceData{
 						Filename: filepath.Join(prefix, "/path/to/script.js"),
-						Data: []byte(`
-			export let file = open("` + openPath + `");
+						Data: []byte(fmt.Sprintf(`
+			export let file = open("%s");
 			export default function() { return file };
-		`),
+		`, openPath)),
 					}
 					sourceBundle, err := NewBundle(src, fs, lib.RuntimeOptions{})
 					if tCase.isError {
