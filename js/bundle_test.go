@@ -493,7 +493,7 @@ func TestOpen(t *testing.T) {
 					openPath = filepath.Join(prefix, openPath)
 				}
 				if runtime.GOOS == "windows" {
-					strings.Replace(openPath, `\`, `\\\\`, -1)
+					openPath = strings.Replace(openPath, `\`, `\\`, -1)
 				}
 				spew.Dump(openPath)
 
