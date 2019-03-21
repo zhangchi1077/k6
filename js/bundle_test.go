@@ -27,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -490,6 +491,9 @@ func TestOpen(t *testing.T) {
 				// if fullpath prepend prefix
 				if openPath[0] == '/' {
 					openPath = filepath.Join(prefix, openPath)
+				}
+				if runtime.GOOS == "windows" {
+					strings.Replace(openPath, `\`, `\\`)
 				}
 
 				t.Run(tCase.name, func(t *testing.T) {
