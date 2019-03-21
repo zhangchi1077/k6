@@ -498,12 +498,14 @@ func TestOpen(t *testing.T) {
 				spew.Dump(openPath)
 
 				t.Run(tCase.name, func(t *testing.T) {
-					src := &lib.SourceData{
-						Filename: filepath.Join(prefix, "/path/to/script.js"),
-						Data: []byte(fmt.Sprintf(`
+					script = fmt.Sprintf(`
 			export let file = open("%s");
 			export default function() { return file };
-		`, openPath)),
+		`, openPath)
+					spew.Dump(script)
+					src := &lib.SourceData{
+						Filename: filepath.Join(prefix, "/path/to/script.js"),
+						Data:     []byte(script),
 					}
 					sourceBundle, err := NewBundle(src, fs, lib.RuntimeOptions{})
 					if tCase.isError {
