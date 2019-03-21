@@ -489,23 +489,21 @@ func TestOpen(t *testing.T) {
 				tCase := tCase
 				var openPath = tCase.openPath
 				// if fullpath prepend prefix
-				if openPath[0] == '/' || openPath[0] == '\\' {
+				if openPath[0] == `/` || openPath[0] == `\` {
 					openPath = filepath.Join(prefix, openPath)
 				}
 				if runtime.GOOS == "windows" {
-					openPath = strings.Replace(openPath, `\`, `\\`, -1)
+					strings.Replace(openPath, `\`, `\\`, -1)
 				}
 				spew.Dump(openPath)
 
 				t.Run(tCase.name, func(t *testing.T) {
-					var script = fmt.Sprintf(`
-			export let file = open("%s");
-			export default function() { return file };
-		`, openPath)
-					spew.Dump(script)
 					src := &lib.SourceData{
 						Filename: filepath.Join(prefix, "/path/to/script.js"),
-						Data:     []byte(script),
+						Data: []byte(`
+			export let file = open("` + openPath + `");
+			export default function() { return file };
+		`),
 					}
 					sourceBundle, err := NewBundle(src, fs, lib.RuntimeOptions{})
 					if tCase.isError {
