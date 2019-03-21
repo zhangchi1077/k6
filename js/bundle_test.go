@@ -489,11 +489,11 @@ func TestOpen(t *testing.T) {
 				tCase := tCase
 				var openPath = tCase.openPath
 				// if fullpath prepend prefix
-				if openPath[0] == '/' {
+				if openPath[0] == '/' || openPath[0] == '\\' {
 					openPath = filepath.Join(prefix, openPath)
 				}
 				if runtime.GOOS == "windows" {
-					strings.Replace(openPath, "\\", "\\\\\\\\", -1)
+					strings.Replace(openPath, `\`, `\\\\`, -1)
 				}
 				spew.Dump(openPath)
 
