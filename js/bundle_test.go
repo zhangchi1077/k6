@@ -615,7 +615,7 @@ func TestWindows(t *testing.T) {
 	fs := afero.NewOsFs()
 	afero.WriteFile(fs, filepath.Join(prefix, "test.text"), []byte("hi"), 0644)
 	src := &lib.SourceData{
-		Filename: filepath.Join(prefix, prefix+"/to/script.js"),
+		Filename: filepath.Join(prefix, "/to/script.js"),
 		Data: []byte(`
 			export let file = open("..\\test.txt");
 			export default function() { return file };
