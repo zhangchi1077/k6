@@ -138,6 +138,7 @@ func errorCodeForError(err error) (errCode, string) {
 				if iErr.Err.Error() == syscall.ECONNREFUSED.Error() {
 					return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
 				}
+				spew.Dump(iErr.Err)
 			}
 			spew.Dump(e.Err)
 			return tcpDialErrorCode, err.Error()
