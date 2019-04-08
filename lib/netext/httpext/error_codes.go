@@ -137,11 +137,7 @@ func errorCodeForError(err error) (errCode, string) {
 			}
 			if iErr, ok := e.Err.(*os.SyscallError); ok {
 				if errno, ok := iErr.Err.(syscall.Errno); ok {
-					if runtime.GOOS == "windows" {
-						// windows reserves errors below 1<<29 for applications but the errno in go is still below 1<<29
-						errno -= 1 << 29
-					}
-					if errno == syscall.ECONNREFUSED {
+					if errno == syscall.ECONNREFUSED || errno == 10000+syscall.ECONNREFUSED {
 						return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
 					}
 					return tcpDialUnknownErrnoCode, fmt.Sprintf("dial: unknown errno %d error with msg `%s`", errno, iErr.Err)
