@@ -139,7 +139,7 @@ func errorCodeForError(err error) (errCode, string) {
 					return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
 				}
 			}
-			spew.Dump(err)
+			spew.Dump(e.Err)
 			return tcpDialErrorCode, err.Error()
 		}
 		switch inErr := e.Err.(type) {
