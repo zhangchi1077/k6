@@ -30,6 +30,7 @@ import (
 	"runtime"
 	"syscall"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/pkg/errors"
 	"golang.org/x/net/http2"
@@ -138,6 +139,7 @@ func errorCodeForError(err error) (errCode, string) {
 					return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
 				}
 			}
+			spew.Dump(err)
 			return tcpDialErrorCode, err.Error()
 		}
 		switch inErr := e.Err.(type) {
