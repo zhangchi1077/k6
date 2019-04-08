@@ -53,6 +53,7 @@ const (
 	tcpDialErrorCode         errCode = 1210
 	tcpDialTimeoutErrorCode  errCode = 1211
 	tcpDialRefusedErrorCode  errCode = 1212
+	tcpDialUnknownErrnoCode  errCode = 1213
 	tcpResetByPeerErrorCode  errCode = 1220
 	// TLS errors
 	defaultTLSErrorCode           errCode = 1300
@@ -135,10 +136,12 @@ func errorCodeForError(err error) (errCode, string) {
 				return tcpDialTimeoutErrorCode, tcpDialTimeoutErrorCodeMsg
 			}
 			if iErr, ok := e.Err.(*os.SyscallError); ok {
-				if iErr.Err.Error() == syscall.ECONNREFUSED.Error() {
-					return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
+				if errno, ok := iErr.Err.(syscall.Errno); ok {
+					if errno == syscall.ECONNREFUSED {
+						return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
+					}
+					return tcpDialUnknownErrnoCode, fmt.Sprintf("dial: unknown errno %d error with msg `%s`", errno, errno.Error())
 				}
-				spew.Dump(iErr.Err)
 			}
 			spew.Dump(e.Err)
 			return tcpDialErrorCode, err.Error()
