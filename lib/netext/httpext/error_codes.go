@@ -142,8 +142,7 @@ func errorCodeForError(err error) (errCode, string) {
 						return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
 					}
 					spew.Dump(int(syscall.ECONNREFUSED))
-					spew.Dump(int(syscall.ECONNREFUSED))
-					return tcpDialUnknownErrnoCode, fmt.Sprintf("dial: unknown errno %d error with msg `%s`", errno, iErr.Err)
+					return tcpDialUnknownErrnoCode, fmt.Sprintf("dial: unknown errno %d (%s) error with msg `%s`", errno, errno, iErr.Err)
 				}
 			}
 			spew.Dump(e.Err)
