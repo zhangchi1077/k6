@@ -30,7 +30,6 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/loadimpact/k6/lib/netext"
 	"github.com/pkg/errors"
 	"golang.org/x/net/http2"
@@ -137,15 +136,12 @@ func errorCodeForError(err error) (errCode, string) {
 			}
 			if iErr, ok := e.Err.(*os.SyscallError); ok {
 				if errno, ok := iErr.Err.(syscall.Errno); ok {
-					if errno == syscall.ECONNREFUSED || errno == 1<<29+syscall.ECONNREFUSED ||
-						errno == syscall.ECONNABORTED || errno == 1<<29+syscall.ECONNABORTED {
+					if errno == syscall.ECONNREFUSED || errno == 10060 {
 						return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
 					}
-					spew.Dump(int(syscall.ECONNREFUSED))
 					return tcpDialUnknownErrnoCode, fmt.Sprintf("dial: unknown errno %d (%s) error with msg `%s`", errno, errno, iErr.Err)
 				}
 			}
-			spew.Dump(e.Err)
 			return tcpDialErrorCode, err.Error()
 		}
 		switch inErr := e.Err.(type) {
