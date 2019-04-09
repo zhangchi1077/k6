@@ -140,7 +140,7 @@ func errorCodeForError(err error) (errCode, string) {
 					if errno == syscall.ECONNREFUSED || errno == 10000+syscall.ECONNREFUSED {
 						return tcpDialRefusedErrorCode, tcpDialRefusedErrorCodeMsg
 					}
-					spew.Dump(syscall.ECONNREFUSED)
+					spew.Dump(int(syscall.ECONNREFUSED))
 					return tcpDialUnknownErrnoCode, fmt.Sprintf("dial: unknown errno %d error with msg `%s`", errno, iErr.Err)
 				}
 			}
