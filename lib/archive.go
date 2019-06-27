@@ -35,6 +35,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/spf13/afero"
 )
 
@@ -240,6 +241,7 @@ func (arc *Archive) Write(out io.Writer) error {
 		files := make(map[string][]byte)
 		err = afero.Walk(fs, "/",
 			filepath.WalkFunc(func(filePath string, info os.FileInfo, err error) error {
+				spew.Dump(filePath)
 				if err != nil {
 					return err
 				}
