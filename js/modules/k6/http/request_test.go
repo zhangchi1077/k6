@@ -314,6 +314,23 @@ func TestRequestAndBatch(t *testing.T) {
 			`))
 			assert.NoError(t, err)
 		})
+		t.Run("custom compression", func(t *testing.T) {
+
+			tb.Mux.HandleFunc("/customcompression", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Encoding", "custom")
+				_, err := w.Write([]byte(`{"custom": true}`))
+				assert.NoError(t, err)
+			}))
+			// TODO: check an error on `res` that shows that we don't support a decompression for
+			// `custom` encoder
+			_, err := common.RunString(rt, sr(`
+				let res = http.get("HTTPBIN_URL/customcompression");
+				if (res.json()["custom"] != true) {
+					throw new Error("unexpected body data: " + res.body)
+				}
+			`))
+			assert.NoError(t, err)
+		})
 	})
 	t.Run("CompressionWithAcceptEncodingHeader", func(t *testing.T) {
 		t.Run("gzip", func(t *testing.T) {
