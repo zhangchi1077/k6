@@ -178,7 +178,19 @@ func (varc VariableArrivalRateConfig) getPlannedRateChanges(segment *lib.Executi
 	// the rational value for scale(20%, 1/sec) is 0.2/sec, or rather 1/5sec...
 	currentRate := getScaledArrivalRate(segment, varc.StartRate.Int64, timeUnit)
 
-	rateChanges := []rateChange{}
+	var size int
+	for i, stage := range varc.Stages {
+		if stage.Duration.Duration == 0 &&
+			(i == 0 ||
+				(i >= 2 && varc.Stages[i-1].Target.Int64 != stage.Target.Int64 &&
+					varc.Stages[i-1].Target.Int64 == varc.Stages[i-2].Target.Int64)) {
+			size++
+		} else if i == 0 || varc.Stages[i-1].Target.Int64 != stage.Target.Int64 {
+			size += int(time.Duration(stage.Duration.Duration) / minIntervalBetweenRateAdjustments)
+		}
+	}
+
+	rateChanges := make([]rateChange, 0, size)
 	timeFromStart := time.Duration(0)
 
 	for _, stage := range varc.Stages {
