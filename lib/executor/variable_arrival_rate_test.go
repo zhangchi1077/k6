@@ -14,7 +14,6 @@ import (
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	null "gopkg.in/guregu/null.v3"
 )
@@ -75,42 +74,32 @@ func TestGetPlannedRateChanges(t *testing.T) {
 
 	var v *lib.ExecutionSegment
 	changes := config.getPlannedRateChanges(v)
+	c := func(change rateChange, start, duration time.Duration, from, to int64) types.Duration {
+		var coef = big.NewRat(
+			(change.timeOffset - start).Nanoseconds(),
+			duration.Nanoseconds(),
+		)
+
+		var oneRat = new(big.Rat).Mul(big.NewRat(from-to, 1), coef)
+		oneRat = new(big.Rat).Sub(big.NewRat(from, 1), oneRat)
+		oneRat = new(big.Rat).Mul(big.NewRat(int64(time.Second), 1), new(big.Rat).Inv(oneRat))
+		return types.Duration(new(big.Int).Div(oneRat.Num(), oneRat.Denom()).Int64())
+	}
+	var expectedTickerPeriod types.Duration
 	for i, change := range changes {
-		require.Equal(t, time.Duration(0),
-			change.timeOffset%minIntervalBetweenRateAdjustments, "%d index", i)
 		switch {
 		case change.timeOffset <= time.Minute*2:
-			var oneRat = new(big.Rat).Mul(
-				big.NewRat(1000000000, 50),
-				big.NewRat((2*time.Minute).Nanoseconds(), change.timeOffset.Nanoseconds()))
-			var one = types.Duration(new(big.Int).Div(oneRat.Num(), oneRat.Denom()).Int64())
-			var two = change.tickerPeriod.Duration
-			require.Equal(t, one, two, "%d index %s %s", i, one, two)
+			expectedTickerPeriod = c(change, 0, time.Minute*2, 0, 50)
 		case change.timeOffset < time.Minute*4:
-			var coef = big.NewRat(
-				(change.timeOffset - time.Minute*3).Nanoseconds(),
-				(time.Minute).Nanoseconds(),
-			)
-			var oneRat = new(big.Rat).Mul(big.NewRat(50, 1), coef)
-			oneRat = oneRat.Add(oneRat, big.NewRat(50, 1))
-			oneRat = new(big.Rat).Mul(big.NewRat(int64(time.Second), 1), new(big.Rat).Inv(oneRat))
-			var one = types.Duration(new(big.Int).Div(oneRat.Num(), oneRat.Denom()).Int64())
-			var two = change.tickerPeriod.Duration
-			require.Equal(t, two, one, "%d index %s %s", i, one, two)
+			expectedTickerPeriod = c(change, time.Minute*3, time.Minute, 50, 100)
 		case change.timeOffset == time.Minute*4:
-			assert.Equal(t, change.tickerPeriod.Duration, types.Duration(time.Millisecond*5))
+			expectedTickerPeriod = types.Duration(5 * time.Millisecond)
 		default:
-			var coef = big.NewRat(
-				(change.timeOffset - time.Minute*4).Nanoseconds(),
-				(time.Second * 23).Nanoseconds(),
-			)
-			var oneRat = new(big.Rat).Mul(big.NewRat(150, 1), coef)
-			oneRat = new(big.Rat).Sub(big.NewRat(200, 1), oneRat)
-			oneRat = new(big.Rat).Mul(big.NewRat(int64(time.Second), 1), new(big.Rat).Inv(oneRat))
-			var one = types.Duration(new(big.Int).Div(oneRat.Num(), oneRat.Denom()).Int64())
-			var two = change.tickerPeriod.Duration
-			require.Equal(t, two, one, "%d index %s %s", i, one, two)
+			expectedTickerPeriod = c(change, 4*time.Minute, 23*time.Second, 200, 50)
 		}
+		require.Equal(t, time.Duration(0),
+			change.timeOffset%minIntervalBetweenRateAdjustments, "%d index %+v", i, change)
+		require.Equal(t, change.tickerPeriod.Duration, expectedTickerPeriod, "%d index %+v", i, change)
 	}
 }
 
