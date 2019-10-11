@@ -273,6 +273,7 @@ func Convert(h HAR, options lib.Options, minSleep, maxSleep uint, enableChecks b
 
 				fprint(w, "\t\treq = [")
 				for k, e := range batchEntries {
+					// TODO: We can probably write directly to w
 					r, err := buildK6RequestObject(e.Request)
 					if err != nil {
 						return "", err
@@ -335,58 +336,62 @@ func Convert(h HAR, options lib.Options, minSleep, maxSleep uint, enableChecks b
 }
 
 func buildK6RequestObject(req *Request) (string, error) {
-	var b bytes.Buffer
-	w := bufio.NewWriter(&b)
-
-	fprint(w, "{\n")
+	var m = make(map[string]interface{})
 
 	method := strings.ToLower(req.Method)
 	if method == "delete" {
 		method = "del"
 	}
-	fprintf(w, `"method": %q, "url": %q`, method, req.URL)
+	m["method"] = method
+	m["url"] = req.URL
 
 	if req.PostData != nil && method != "get" {
-		postParams, plainText, err := buildK6Body(req)
+		// TODO: do this with only one result and an error
+		postParams, plainText, err := buildK6BodyMap(req)
 		if err != nil {
 			return "", err
-		} else if len(postParams) > 0 {
-			fprintf(w, `, "body": { %s }`, strings.Join(postParams, ", "))
+		}
+		if len(postParams) > 0 {
+			m["body"] = postParams
 		} else if plainText != "" {
-			fprintf(w, `, "body": %q`, plainText)
+			m["body"] = plainText
 		}
 	}
 
-	var params []string
-	var cookies []string
-	for _, c := range req.Cookies {
-		cookies = append(cookies, fmt.Sprintf(`%q: %q`, c.Name, c.Value))
-	}
-	if len(cookies) > 0 {
-		params = append(params, fmt.Sprintf(`"cookies": { %s }`, strings.Join(cookies, ", ")))
-	}
-
-	if headers := buildK6Headers(req.Headers); len(headers) > 0 {
-		params = append(params, fmt.Sprintf(`"headers": { %s }`, strings.Join(headers, ", ")))
+	if len(req.Cookies) > 0 {
+		var cookies = make(map[string]string, len(req.Cookies))
+		for _, c := range req.Cookies {
+			cookies[c.Name] = c.Value
+		}
+		m["cookies"] = cookies
 	}
 
-	if len(params) > 0 {
-		fprintf(w, `, "params": { %s }`, strings.Join(params, ", "))
+	if len(req.Headers) > 0 {
+		m["headers"] = buildK6HeadersMap(req.Headers)
 	}
 
-	fprint(w, "}")
-	if err := w.Flush(); err != nil {
-		return "", err
-	}
-
-	var buffer bytes.Buffer
-	err := json.Indent(&buffer, b.Bytes(), "\t\t", "\t")
+	b, err := json.MarshalIndent(m, "\t\t", "\t")
 	if err != nil {
 		return "", err
 	}
-	return buffer.String(), nil
+	return string(b), nil
 }
 
+func buildK6HeadersMap(origHeaders []Header) map[string]string {
+	ignored := map[string]bool{"cookie": true, "content-length": true}
+
+	var headers = make(map[string]string, len(origHeaders))
+	for _, header := range origHeaders {
+		name := strings.ToLower(header.Name)
+		_, isIgnored := ignored[name]
+		// Avoid SPDY's, duplicated or ignored headers
+		if !isIgnored && name[0] != ':' {
+			ignored[name] = true
+			headers[header.Name] = header.Value
+		}
+	}
+	return headers
+}
 func buildK6Headers(headers []Header) []string {
 	var h []string
 	if len(headers) > 0 {
@@ -402,6 +407,25 @@ func buildK6Headers(headers []Header) []string {
 		}
 	}
 	return h
+}
+
+func buildK6BodyMap(req *Request) (map[string]string, string, error) {
+	if req.PostData.MimeType == "application/x-www-form-urlencoded" && len(req.PostData.Params) > 0 {
+		var postParams = make(map[string]string, len(req.PostData.Params))
+		for _, p := range req.PostData.Params {
+			n, err := url.QueryUnescape(p.Name)
+			if err != nil {
+				return postParams, "", err
+			}
+			v, err := url.QueryUnescape(p.Value)
+			if err != nil {
+				return postParams, "", err
+			}
+			postParams[n] = v
+		}
+		return postParams, "", nil
+	}
+	return nil, req.PostData.Text, nil
 }
 
 func buildK6Body(req *Request) ([]string, string, error) {

@@ -21,14 +21,18 @@
 package har
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"testing"
 
 	"github.com/loadimpact/k6/js"
 	"github.com/loadimpact/k6/lib"
+	"github.com/loadimpact/k6/lib/testutils/httpmultibin"
 	"github.com/loadimpact/k6/loader"
+	"github.com/loadimpact/k6/stats"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBuildK6Headers(t *testing.T) {
@@ -48,23 +52,66 @@ func TestBuildK6Headers(t *testing.T) {
 }
 
 func TestBuildK6RequestObject(t *testing.T) {
-	req := &Request{
-		Method:  "get",
-		URL:     "http://www.google.es",
-		Headers: []Header{{"accept-language", "es-ES,es;q=0.8"}},
-		Cookies: []Cookie{{Name: "a", Value: "b"}},
-	}
-	v, err := buildK6RequestObject(req)
-	assert.NoError(t, err)
-	_, err = js.New(&loader.SourceData{
-		URL:  &url.URL{Path: "/script.js"},
-		Data: []byte(fmt.Sprintf("export default function() { res = http.batch([%v]); }", v)),
-	}, nil, lib.RuntimeOptions{})
-	assert.NoError(t, err)
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	defer tb.Cleanup()
+	sr := tb.Replacer.Replace
+
+	t.Run("get", func(t *testing.T) {
+		req := &Request{
+			Method:  "get",
+			URL:     sr("HTTPBIN_URL/get"),
+			Headers: []Header{{"accept-language", "es-ES,es;q=0.8"}},
+			Cookies: []Cookie{{Name: "a", Value: "b"}},
+		}
+		v, err := buildK6RequestObject(req)
+		assert.NoError(t, err)
+		_, err = js.New(&loader.SourceData{
+			URL:  &url.URL{Path: "/script.js"},
+			Data: []byte(fmt.Sprintf("export default function() { res = http.batch([%v]); }", v)),
+		}, nil, lib.RuntimeOptions{})
+		assert.NoError(t, err)
+	})
+
+	t.Run("post", func(t *testing.T) {
+		req := &Request{
+			Method:  "post",
+			URL:     sr("HTTPBIN_URL/post"),
+			Headers: []Header{{"accept-language", "es-ES,es;q=0.8"}},
+			Cookies: []Cookie{{Name: "a", Value: "b"}},
+			PostData: &PostData{
+				Text:     "x\x01«VJIV²270ÕQª(V²240¨\x05\x002Ö\x05\x00",
+				MimeType: "text/plain",
+			},
+		}
+		v, err := buildK6RequestObject(req)
+		require.NoError(t, err)
+		r, err := js.New(&loader.SourceData{
+			URL: &url.URL{Path: "/script.js"},
+			Data: []byte(fmt.Sprintf(`
+			import http from "k6/http";
+			export default function() {
+				let res = http.batch([%s]);
+				if (res[0].status != 200) {
+					throw new Error(JSON.stringify(res));
+				}
+			}`, v)),
+		}, nil, lib.RuntimeOptions{})
+		require.NoError(t, err)
+
+		r.SetOptions(lib.Options{
+			Hosts: tb.Dialer.Hosts,
+		})
+
+		ctx := context.Background()
+		ch := make(chan<- stats.SampleContainer, 1000)
+		vu, err := r.NewVU(ch)
+		require.NoError(t, err)
+		err = vu.RunOnce(ctx)
+		require.NoError(t, err)
+	})
 }
 
 func TestBuildK6Body(t *testing.T) {
-
 	bodyText := "ccustemail=ppcano%40gmail.com&size=medium&topping=cheese&delivery=12%3A00&comments="
 
 	req := &Request{
