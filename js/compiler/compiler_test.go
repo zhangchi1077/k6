@@ -28,13 +28,13 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	c, err := New()
+	c, err := New(CompatibilityModeES6)
 	assert.NotNil(t, c)
 	assert.NoError(t, err)
 }
 
 func TestTransform(t *testing.T) {
-	c, err := New()
+	c, err := New(CompatibilityModeES6)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -78,7 +78,7 @@ func TestTransform(t *testing.T) {
 }
 
 func TestCompile(t *testing.T) {
-	c, err := New()
+	c, err := New(CompatibilityModeES6)
 	if !assert.NoError(t, err) {
 		return
 	}

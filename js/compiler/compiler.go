@@ -48,42 +48,58 @@ var (
 	once             sync.Once
 )
 
+// CompatibilityMode specifies the JS compatibility mode
+// nolint:lll
+//go:generate enumer -type=CompatibilityMode -transform=snake -trimprefix CompatibilityMode -output compatibility_mode_gen.go
+type CompatibilityMode uint
+
+// "es6": default, Goja+Babel+core.js
+// "es51": plain Goja
+const (
+	CompatibilityModeES6 CompatibilityMode = iota
+	CompatibilityModeES51
+)
+
 // A Compiler uses Babel to compile ES6 code into something ES5-compatible.
 type Compiler struct {
 	vm *goja.Runtime
 
 	// JS pointers.
-	this      goja.Value
-	transform goja.Callable
-	mutex     sync.Mutex //TODO: cache goja.CompileAST() in an init() function?
+	this              goja.Value
+	transform         goja.Callable
+	mutex             sync.Mutex //TODO: cache goja.CompileAST() in an init() function?
+	compatibilityMode CompatibilityMode
 }
 
-// Constructs a new compiler.
-func New() (*Compiler, error) {
+// New constructs a new compiler with the provided compatibility mode
+func New(compatMode CompatibilityMode) (*Compiler, error) {
 	var err error
 	once.Do(func() {
-		compilerInstance, err = new()
+		compilerInstance, err = new(compatMode)
 	})
 
 	return compilerInstance, err
 }
 
-func new() (*Compiler, error) {
+func new(compatMode CompatibilityMode) (*Compiler, error) {
 	conf := rice.Config{
 		LocateOrder: []rice.LocateMethod{rice.LocateEmbedded},
 	}
 
-	babelSrc := conf.MustFindBox("lib").MustString("babel.min.js")
+	c := &Compiler{vm: goja.New(), compatibilityMode: compatMode}
+	logrus.WithField("compatibilityMode", compatMode).Debug("Created JS compiler")
 
-	c := &Compiler{vm: goja.New()}
-	if _, err := c.vm.RunString(babelSrc); err != nil {
-		return nil, err
-	}
+	if compatMode == CompatibilityModeES6 {
+		babelSrc := conf.MustFindBox("lib").MustString("babel.min.js")
+		if _, err := c.vm.RunString(babelSrc); err != nil {
+			return nil, err
+		}
 
-	c.this = c.vm.Get("Babel")
-	thisObj := c.this.ToObject(c.vm)
-	if err := c.vm.ExportTo(thisObj.Get("transform"), &c.transform); err != nil {
-		return nil, err
+		c.this = c.vm.Get("Babel")
+		thisObj := c.this.ToObject(c.vm)
+		if err := c.vm.ExportTo(thisObj.Get("transform"), &c.transform); err != nil {
+			return nil, err
+		}
 	}
 
 	return c, nil
@@ -123,21 +139,21 @@ func (c *Compiler) Transform(src, filename string) (code string, srcmap SourceMa
 	return code, srcmap, nil
 }
 
-// Compiles the program, first trying ES5, then ES6.
+// Compile the program
 func (c *Compiler) Compile(src, filename string, pre, post string, strict bool) (*goja.Program, string, error) {
-	return c.compile(src, filename, pre, post, strict, true)
+	return c.compile(src, filename, pre, post, strict)
 }
 
-func (c *Compiler) compile(src, filename string, pre, post string, strict, tryBabel bool) (*goja.Program, string, error) {
+func (c *Compiler) compile(src, filename string, pre, post string, strict bool) (*goja.Program, string, error) {
 	code := pre + src + post
 	ast, err := parser.ParseFile(nil, filename, code, 0)
 	if err != nil {
-		if tryBabel {
+		if c.compatibilityMode == CompatibilityModeES6 {
 			code, _, err := c.Transform(src, filename)
 			if err != nil {
 				return nil, code, err
 			}
-			return c.compile(code, filename, pre, post, strict, false)
+			return c.compile(code, filename, pre, post, strict)
 		}
 		return nil, src, err
 	}

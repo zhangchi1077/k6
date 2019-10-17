@@ -26,7 +26,9 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"strings"
 
+	"github.com/loadimpact/k6/js/compiler"
 	"github.com/loadimpact/k6/lib/scheduler"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
@@ -281,6 +283,9 @@ type Options struct {
 
 	// Redirect console logging to a file
 	ConsoleOutput null.String `json:"-" envconfig:"console_output"`
+
+	// JS compatibility mode: "es51" (plain Goja) or "es6" (Goja+Babel+core.js)
+	CompatibilityMode null.String `json:"compatibilityMode" envconfig:"compatibility_mode"`
 }
 
 // Returns the result of overwriting any fields with any that are set on the argument.
@@ -424,15 +429,38 @@ func (o Options) Apply(opts Options) Options {
 	if opts.ConsoleOutput.Valid {
 		o.ConsoleOutput = opts.ConsoleOutput
 	}
+	if opts.CompatibilityMode.Valid {
+		o.CompatibilityMode = opts.CompatibilityMode
+	}
 
 	return o
+}
+
+// ValidateCompatibilityMode checks if the provided val is a valid compatibility mode
+func ValidateCompatibilityMode(val string) (cm compiler.CompatibilityMode, err error) {
+	if cm, err = compiler.CompatibilityModeString(val); err != nil {
+		var compatValues []string
+		for _, v := range compiler.CompatibilityModeValues() {
+			compatValues = append(compatValues, v.String())
+		}
+		err = fmt.Errorf("invalid compatibility mode '%s'. Use: '%s'",
+			val, strings.Join(compatValues, "', '"))
+	}
+	return
 }
 
 // Validate checks if all of the specified options make sense
 func (o Options) Validate() []error {
 	//TODO: validate all of the other options... that we should have already been validating...
 	//TODO: maybe integrate an external validation lib: https://github.com/avelino/awesome-go#validation
-	return o.Execution.Validate()
+	errors := o.Execution.Validate()
+
+	if _, err := ValidateCompatibilityMode(o.CompatibilityMode.String); err != nil {
+		errors = append(errors, err)
+	}
+
+	return errors
+
 }
 
 // ForEachSpecified enumerates all struct fields and calls the supplied function with each

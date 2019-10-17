@@ -27,6 +27,9 @@ type RuntimeOptions struct {
 	// Whether to pass the actual system environment variables to the JS runtime
 	IncludeSystemEnvVars null.Bool `json:"includeSystemEnvVars" envconfig:"include_system_env_vars"`
 
+	// JS compatibility mode: "es6" (Goja+Babel+core.js) or "es51" (plain Goja)
+	CompatibilityMode null.String `json:"compatibilityMode" envconfig:"compatibility_mode"`
+
 	// Environment variables passed onto the runner
 	Env map[string]string `json:"env" envconfig:"env"`
 }
@@ -36,6 +39,9 @@ type RuntimeOptions struct {
 func (o RuntimeOptions) Apply(opts RuntimeOptions) RuntimeOptions {
 	if opts.IncludeSystemEnvVars.Valid {
 		o.IncludeSystemEnvVars = opts.IncludeSystemEnvVars
+	}
+	if opts.CompatibilityMode.Valid {
+		o.CompatibilityMode = opts.CompatibilityMode
 	}
 	if opts.Env != nil {
 		o.Env = opts.Env

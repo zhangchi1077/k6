@@ -60,7 +60,16 @@ type BundleInstance struct {
 
 // NewBundle creates a new bundle from a source file and a filesystem.
 func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts lib.RuntimeOptions) (*Bundle, error) {
-	compiler, err := compiler.New()
+	compatMode := compiler.CompatibilityModeES6
+	if rtOpts.CompatibilityMode.Valid {
+		if cm, err := lib.ValidateCompatibilityMode(rtOpts.CompatibilityMode.String); err == nil {
+			compatMode = cm
+		} else {
+			return nil, err
+		}
+	}
+
+	compiler, err := compiler.New(compatMode)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +138,15 @@ func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts l
 
 // NewBundleFromArchive creates a new bundle from an lib.Archive.
 func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle, error) {
-	compiler, err := compiler.New()
+	compatMode := compiler.CompatibilityModeES6
+	if rtOpts.CompatibilityMode.Valid {
+		if cm, err := lib.ValidateCompatibilityMode(rtOpts.CompatibilityMode.String); err == nil {
+			compatMode = cm
+		} else {
+			return nil, err
+		}
+	}
+	compiler, err := compiler.New(compatMode)
 	if err != nil {
 		return nil, err
 	}
