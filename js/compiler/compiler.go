@@ -60,7 +60,7 @@ const (
 	CompatibilityModeES51
 )
 
-// A Compiler uses Babel to compile ES6 code into something ES5-compatible.
+// A Compiler compiles JavaScript source code (ES5.1 or ES6) into a goja.Program
 type Compiler struct {
 	vm *goja.Runtime
 
@@ -71,7 +71,10 @@ type Compiler struct {
 	compatibilityMode CompatibilityMode
 }
 
-// New constructs a new compiler with the provided compatibility mode
+// New constructs a new Compiler that will compile using the provided
+// compatibility mode. If compatMode is CompatibilityModeES6 the code
+// will first be transformed into ES5.1 by Babel, to be compatible
+// with Goja.
 func New(compatMode CompatibilityMode) (*Compiler, error) {
 	var err error
 	once.Do(func() {
