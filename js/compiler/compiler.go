@@ -51,7 +51,7 @@ var (
 // CompatibilityMode specifies the JS compatibility mode
 // nolint:lll
 //go:generate enumer -type=CompatibilityMode -transform=snake -trimprefix CompatibilityMode -output compatibility_mode_gen.go
-type CompatibilityMode uint
+type CompatibilityMode uint8
 
 // "es6": default, Goja+Babel+core.js
 // "es51": plain Goja
