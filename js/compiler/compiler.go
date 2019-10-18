@@ -56,7 +56,7 @@ type CompatibilityMode uint
 // "es6": default, Goja+Babel+core.js
 // "es51": plain Goja
 const (
-	CompatibilityModeES6 CompatibilityMode = iota
+	CompatibilityModeES6 CompatibilityMode = iota + 1
 	CompatibilityModeES51
 )
 

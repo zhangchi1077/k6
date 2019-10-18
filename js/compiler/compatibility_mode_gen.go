@@ -12,17 +12,18 @@ const _CompatibilityModeName = "es6es51"
 var _CompatibilityModeIndex = [...]uint8{0, 3, 7}
 
 func (i CompatibilityMode) String() string {
+	i -= 1
 	if i >= CompatibilityMode(len(_CompatibilityModeIndex)-1) {
-		return fmt.Sprintf("CompatibilityMode(%d)", i)
+		return fmt.Sprintf("CompatibilityMode(%d)", i+1)
 	}
 	return _CompatibilityModeName[_CompatibilityModeIndex[i]:_CompatibilityModeIndex[i+1]]
 }
 
-var _CompatibilityModeValues = []CompatibilityMode{0, 1}
+var _CompatibilityModeValues = []CompatibilityMode{1, 2}
 
 var _CompatibilityModeNameToValueMap = map[string]CompatibilityMode{
-	_CompatibilityModeName[0:3]: 0,
-	_CompatibilityModeName[3:7]: 1,
+	_CompatibilityModeName[0:3]: 1,
+	_CompatibilityModeName[3:7]: 2,
 }
 
 // CompatibilityModeString retrieves an enum value from the enum constants string name.
