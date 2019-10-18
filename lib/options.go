@@ -443,8 +443,8 @@ func ValidateCompatibilityMode(val string) (cm compiler.CompatibilityMode, err e
 		for _, v := range compiler.CompatibilityModeValues() {
 			compatValues = append(compatValues, v.String())
 		}
-		err = fmt.Errorf("invalid compatibility mode '%s'. Use: '%s'",
-			val, strings.Join(compatValues, "', '"))
+		err = fmt.Errorf(`invalid compatibility mode "%s". Use: "%s"`,
+			val, strings.Join(compatValues, `", "`))
 	}
 	return
 }
@@ -460,7 +460,6 @@ func (o Options) Validate() []error {
 	}
 
 	return errors
-
 }
 
 // ForEachSpecified enumerates all struct fields and calls the supplied function with each
