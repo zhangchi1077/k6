@@ -48,7 +48,8 @@ type Bundle struct {
 
 	BaseInitContext *InitContext
 
-	Env map[string]string
+	Env               map[string]string
+	compatibilityMode compiler.CompatibilityMode
 }
 
 // A BundleInstance is a self-contained instance of a Bundle.
@@ -83,11 +84,12 @@ func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts l
 	// Make a bundle, instantiate it into a throwaway VM to populate caches.
 	rt := goja.New()
 	bundle := Bundle{
-		Filename:        src.URL,
-		Source:          code,
-		Program:         pgm,
-		BaseInitContext: NewInitContext(rt, compiler, new(context.Context), filesystems, loader.Dir(src.URL)),
-		Env:             rtOpts.Env,
+		Filename:          src.URL,
+		Source:            code,
+		Program:           pgm,
+		BaseInitContext:   NewInitContext(rt, compiler, new(context.Context), filesystems, loader.Dir(src.URL)),
+		Env:               rtOpts.Env,
+		compatibilityMode: compatMode,
 	}
 	if err := bundle.instantiate(rt, bundle.BaseInitContext); err != nil {
 		return nil, err
@@ -172,12 +174,13 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 	}
 
 	bundle := &Bundle{
-		Filename:        arc.FilenameURL,
-		Source:          string(arc.Data),
-		Program:         pgm,
-		Options:         arc.Options,
-		BaseInitContext: initctx,
-		Env:             env,
+		Filename:          arc.FilenameURL,
+		Source:            string(arc.Data),
+		Program:           pgm,
+		Options:           arc.Options,
+		BaseInitContext:   initctx,
+		Env:               env,
+		compatibilityMode: compatMode,
 	}
 	if err := bundle.instantiate(bundle.BaseInitContext.runtime, bundle.BaseInitContext); err != nil {
 		return nil, err
@@ -252,8 +255,10 @@ func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext) error {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
 
-	if _, err := rt.RunProgram(jslib.GetCoreJS()); err != nil {
-		return err
+	if b.compatibilityMode == compiler.CompatibilityModeES6 {
+		if _, err := rt.RunProgram(jslib.GetCoreJS()); err != nil {
+			return err
+		}
 	}
 
 	exports := rt.NewObject()
