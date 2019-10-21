@@ -31,7 +31,6 @@ import (
 	"github.com/dop251/goja"
 	"github.com/loadimpact/k6/js/common"
 	"github.com/loadimpact/k6/js/compiler"
-	jslib "github.com/loadimpact/k6/js/lib"
 	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/loader"
 	"github.com/pkg/errors"
@@ -41,10 +40,11 @@ import (
 // A Bundle is a self-contained bundle of scripts and resources.
 // You can use this to produce identical BundleInstance objects.
 type Bundle struct {
-	Filename *url.URL
-	Source   string
-	Program  *goja.Program
-	Options  lib.Options
+	Filename   *url.URL
+	Source     string
+	PreProgram *goja.Program // runs preprocessor code, applies shims, etc.
+	Program    *goja.Program
+	Options    lib.Options
 
 	BaseInitContext *InitContext
 
@@ -72,16 +72,17 @@ func NewBundle(src *loader.SourceData, filesystems map[string]afero.Fs, rtOpts l
 	// Compile sources, both ES5 and ES6 are supported.
 	code := string(src.Data)
 	c := compiler.New()
-	pgm, _, err := c.Compile(code, src.URL.String(), "", "", true, compatMode)
+	pgm, prePgm, _, err := c.Compile(code, src.URL.String(), "", "", true, compatMode)
 	if err != nil {
 		return nil, err
 	}
 	// Make a bundle, instantiate it into a throwaway VM to populate caches.
 	rt := goja.New()
 	bundle := Bundle{
-		Filename: src.URL,
-		Source:   code,
-		Program:  pgm,
+		Filename:   src.URL,
+		Source:     code,
+		Program:    pgm,
+		PreProgram: prePgm,
 		BaseInitContext: NewInitContext(rt, c, compatMode, new(context.Context),
 			filesystems, loader.Dir(src.URL)),
 		Env: rtOpts.Env,
@@ -149,7 +150,7 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 	}
 
 	c := compiler.New()
-	pgm, _, err := c.Compile(string(arc.Data), arc.FilenameURL.String(), "", "", true, compatMode)
+	pgm, prePgm, _, err := c.Compile(string(arc.Data), arc.FilenameURL.String(), "", "", true, compatMode)
 	if err != nil {
 		return nil, err
 	}
@@ -170,6 +171,7 @@ func NewBundleFromArchive(arc *lib.Archive, rtOpts lib.RuntimeOptions) (*Bundle,
 		Filename:        arc.FilenameURL,
 		Source:          string(arc.Data),
 		Program:         pgm,
+		PreProgram:      prePgm,
 		Options:         arc.Options,
 		BaseInitContext: initctx,
 		Env:             env,
@@ -247,8 +249,8 @@ func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext) error {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
 
-	if init.compatibilityMode == compiler.CompatibilityModeES6 {
-		if _, err := rt.RunProgram(jslib.GetCoreJS()); err != nil {
+	if b.PreProgram != nil {
+		if _, err := rt.RunProgram(b.PreProgram); err != nil {
 			return err
 		}
 	}

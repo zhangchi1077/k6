@@ -29,7 +29,7 @@ import (
 func RunString(rt *goja.Runtime, src string) (goja.Value, error) {
 	var err error
 	c := compiler.New()
-	src, _, err = c.Transform(src, "__string__")
+	src, _, err = c.Preprocess(src, "__string__")
 	if err != nil {
 		return goja.Undefined(), err
 	}

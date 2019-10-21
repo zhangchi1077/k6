@@ -30,7 +30,7 @@ import (
 func TestTransform(t *testing.T) {
 	c := New()
 	t.Run("blank", func(t *testing.T) {
-		src, _, err := c.Transform("", "test.js")
+		src, _, err := c.Preprocess("", "test.js")
 		assert.NoError(t, err)
 		assert.Equal(t, `"use strict";`, src)
 		// assert.Equal(t, 3, srcmap.Version)
@@ -38,7 +38,7 @@ func TestTransform(t *testing.T) {
 		// assert.Equal(t, "", srcmap.Mappings)
 	})
 	t.Run("double-arrow", func(t *testing.T) {
-		src, _, err := c.Transform("()=> true", "test.js")
+		src, _, err := c.Preprocess("()=> true", "test.js")
 		assert.NoError(t, err)
 		assert.Equal(t, `"use strict";(function () {return true;});`, src)
 		// assert.Equal(t, 3, srcmap.Version)
@@ -46,7 +46,7 @@ func TestTransform(t *testing.T) {
 		// assert.Equal(t, "aAAA,qBAAK,IAAL", srcmap.Mappings)
 	})
 	t.Run("longer", func(t *testing.T) {
-		src, _, err := c.Transform(strings.Join([]string{
+		src, _, err := c.Preprocess(strings.Join([]string{
 			`function add(a, b) {`,
 			`    return a + b;`,
 			`};`,
@@ -71,10 +71,12 @@ func TestCompile(t *testing.T) {
 	c := New()
 	t.Run("ES5", func(t *testing.T) {
 		src := `1+(function() { return 2; })()`
-		pgm, code, err := c.Compile(src, "script.js", "", "", true, CompatibilityModeES51)
+		pgm, prePgm, code, err := c.Compile(src, "script.js", "", "", true, CompatibilityModeES51)
 		if !assert.NoError(t, err) {
 			return
 		}
+		// Running in ES5 mode, so nothing to preprocess
+		assert.Nil(t, prePgm)
 		assert.Equal(t, src, code)
 		v, err := goja.New().RunProgram(pgm)
 		if assert.NoError(t, err) {
@@ -82,13 +84,15 @@ func TestCompile(t *testing.T) {
 		}
 
 		t.Run("Wrap", func(t *testing.T) {
-			pgm, code, err := c.Compile(src, "script.js",
+			pgm, prePgm, code, err := c.Compile(src, "script.js",
 				"(function(){return ", "})", true, CompatibilityModeES51)
 			if !assert.NoError(t, err) {
 				return
 			}
 			assert.Equal(t, `(function(){return 1+(function() { return 2; })()})`, code)
-			v, err := goja.New().RunProgram(pgm)
+
+			assert.Nil(t, prePgm)
+			v, err = goja.New().RunProgram(pgm)
 			if assert.NoError(t, err) {
 				fn, ok := goja.AssertFunction(v)
 				if assert.True(t, ok, "not a function") {
@@ -102,30 +106,35 @@ func TestCompile(t *testing.T) {
 
 		t.Run("Invalid", func(t *testing.T) {
 			src := `1+(function() { return 2; )()`
-			_, _, err := c.Compile(src, "script.js", "", "", true, CompatibilityModeES6)
+			_, _, _, err := c.Compile(src, "script.js", "", "", true, CompatibilityModeES6)
 			assert.IsType(t, &goja.Exception{}, err)
 			assert.Contains(t, err.Error(), `SyntaxError: script.js: Unexpected token (1:26)
 > 1 | 1+(function() { return 2; )()`)
 		})
 	})
 	t.Run("ES6", func(t *testing.T) {
-		pgm, code, err := c.Compile(`1+(()=>2)()`, "script.js", "", "", true, CompatibilityModeES6)
+		pgm, prePgm, code, err := c.Compile(`1+(()=>2)()`, "script.js", "", "", true, CompatibilityModeES6)
 		if !assert.NoError(t, err) {
 			return
 		}
 		assert.Equal(t, `"use strict";1 + function () {return 2;}();`, code)
-		v, err := goja.New().RunProgram(pgm)
+		vm := goja.New()
+		_, err = vm.RunProgram(prePgm)
+		assert.NoError(t, err)
+		v, err := vm.RunProgram(pgm)
 		if assert.NoError(t, err) {
 			assert.Equal(t, int64(3), v.Export())
 		}
 
 		t.Run("Wrap", func(t *testing.T) {
-			pgm, code, err := c.Compile(`fn(1+(()=>2)())`, "script.js", "(function(fn){", "})", true, CompatibilityModeES6)
+			pgm, prePgm, code, err := c.Compile(`fn(1+(()=>2)())`, "script.js", "(function(fn){", "})", true, CompatibilityModeES6)
 			if !assert.NoError(t, err) {
 				return
 			}
 			assert.Equal(t, `(function(fn){"use strict";fn(1 + function () {return 2;}());})`, code)
 			rt := goja.New()
+			_, err = rt.RunProgram(prePgm)
+			assert.NoError(t, err)
 			v, err := rt.RunProgram(pgm)
 			if assert.NoError(t, err) {
 				fn, ok := goja.AssertFunction(v)
@@ -141,7 +150,7 @@ func TestCompile(t *testing.T) {
 		})
 
 		t.Run("Invalid", func(t *testing.T) {
-			_, _, err := c.Compile(`1+(=>2)()`, "script.js", "", "", true, CompatibilityModeES6)
+			_, _, _, err := c.Compile(`1+(=>2)()`, "script.js", "", "", true, CompatibilityModeES6)
 			assert.IsType(t, &goja.Exception{}, err)
 			assert.Contains(t, err.Error(), `SyntaxError: script.js: Unexpected token (1:3)
 > 1 | 1+(=>2)()`)
