@@ -247,7 +247,7 @@ func (b *Bundle) instantiate(rt *goja.Runtime, init *InitContext) error {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
 
-	if init.CompatibilityMode == compiler.CompatibilityModeES6 {
+	if init.compatibilityMode == compiler.CompatibilityModeES6 {
 		if _, err := rt.RunProgram(jslib.GetCoreJS()); err != nil {
 			return err
 		}

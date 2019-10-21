@@ -57,7 +57,7 @@ type InitContext struct {
 	// Cache of loaded programs and files.
 	programs map[string]programWithSource
 
-	CompatibilityMode compiler.CompatibilityMode
+	compatibilityMode compiler.CompatibilityMode
 }
 
 // NewInitContext creates a new initcontext with the provided arguments
@@ -72,7 +72,7 @@ func NewInitContext(
 		filesystems:       filesystems,
 		pwd:               pwd,
 		programs:          make(map[string]programWithSource),
-		CompatibilityMode: compatMode,
+		compatibilityMode: compatMode,
 	}
 }
 
@@ -96,7 +96,7 @@ func newBoundInitContext(base *InitContext, ctxPtr *context.Context, rt *goja.Ru
 		compiler:    base.compiler,
 
 		programs:          programs,
-		CompatibilityMode: base.CompatibilityMode,
+		compatibilityMode: base.compatibilityMode,
 	}
 }
 
@@ -182,7 +182,7 @@ func (i *InitContext) requireFile(name string) (goja.Value, error) {
 
 func (i *InitContext) compileImport(src, filename string) (*goja.Program, error) {
 	pgm, _, err := i.compiler.Compile(src, filename,
-		"(function(module, exports){\n", "\n})\n", true, i.CompatibilityMode)
+		"(function(module, exports){\n", "\n})\n", true, i.compatibilityMode)
 	return pgm, err
 }
 
