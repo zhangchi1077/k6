@@ -110,7 +110,6 @@ type babel struct {
 	vm        *goja.Runtime
 	this      goja.Value
 	transform goja.Callable
-	opts      map[string]interface{}
 	mutex     sync.Mutex //TODO: cache goja.CompileAST() in an init() function?
 }
 
@@ -126,14 +125,10 @@ func newBabel() (*babel, error) {
 		if _, err = vm.RunString(babelSrc); err != nil {
 			return
 		}
-		opts := make(map[string]interface{})
-		for k, v := range DefaultOpts {
-			opts[k] = v
-		}
 
 		this := vm.Get("Babel")
 		bObj := this.ToObject(vm)
-		babl = &babel{vm: vm, this: this, opts: opts}
+		babl = &babel{vm: vm, this: this}
 		if err = vm.ExportTo(bObj.Get("transform"), &babl.transform); err != nil {
 			return
 		}
@@ -143,7 +138,7 @@ func newBabel() (*babel, error) {
 }
 
 func (b *babel) Transform(src, filename string) (code string, srcmap SourceMap, err error) {
-	opts := b.opts
+	opts := DefaultOpts
 	opts["filename"] = filename
 
 	startTime := time.Now()
