@@ -28,7 +28,7 @@ type RuntimeOptions struct {
 	IncludeSystemEnvVars null.Bool `json:"includeSystemEnvVars" envconfig:"include_system_env_vars"`
 
 	// JS compatibility mode: "es6" (Goja+Babel+core.js) or "es51" (plain Goja)
-	CompatibilityMode null.String `json:"compatibilityMode" envconfig:"compatibility_mode"`
+	CompatibilityMode null.String `json:"compatibilityMode"`
 
 	// Environment variables passed onto the runner
 	Env map[string]string `json:"env" envconfig:"env"`

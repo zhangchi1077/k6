@@ -59,7 +59,7 @@ func runtimeOptionFlagSet(includeSysEnv bool) *pflag.FlagSet {
 	// wasn't redefined here. Functionally it shouldn't matter, but this
 	// should be fixed as part of #883.
 	flags.String("compatibility-mode", "es6",
-		"JavaScript compiler compatibility mode, \"es6\" or \"es51\"")
+		`JavaScript compiler compatibility mode, "es6" or "es51"`)
 	flags.StringArrayP("env", "e", nil, "add/override environment variable with `VAR=value`")
 	return flags
 }

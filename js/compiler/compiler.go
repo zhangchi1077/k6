@@ -93,7 +93,6 @@ func (c *Compiler) compile(src, filename string, pre, post string,
 	ast, err := parser.ParseFile(nil, filename, code, 0)
 	if err != nil {
 		if compatMode == CompatibilityModeES6 {
-			logrus.Debug("Compiling to ES5")
 			code, _, err := c.Transform(src, filename)
 			if err != nil {
 				return nil, code, err
