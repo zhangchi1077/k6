@@ -407,13 +407,15 @@ func TestNewBundle(t *testing.T) {
 	})
 }
 
-func TestNewBundleFromArchive(t *testing.T) {
-	getArchive := func(data string, rtOpts lib.RuntimeOptions) *lib.Archive {
-		b, err := getSimpleBundleWithOptions("script.js", data, rtOpts)
-		assert.NoError(t, err)
-		return b.makeArchive()
+func getArchive(data string, rtOpts lib.RuntimeOptions) (*lib.Archive, error) {
+	b, err := getSimpleBundleWithOptions("script.js", data, rtOpts)
+	if err != nil {
+		return nil, err
 	}
+	return b.makeArchive(), nil
+}
 
+func TestNewBundleFromArchive(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		testCases := []struct {
 			name   string
@@ -431,7 +433,8 @@ func TestNewBundleFromArchive(t *testing.T) {
 		for _, tc := range testCases {
 			tc := tc
 			t.Run(tc.name, func(t *testing.T) {
-				arc := getArchive(tc.code, tc.rtOpts)
+				arc, err := getArchive(tc.code, tc.rtOpts)
+				assert.NoError(t, err)
 				b, err := NewBundleFromArchive(arc, tc.rtOpts)
 				if !assert.NoError(t, err) {
 					return
@@ -451,34 +454,6 @@ func TestNewBundleFromArchive(t *testing.T) {
 		}
 	})
 
-	t.Run("err", func(t *testing.T) {
-		testCases := []struct {
-			name       string
-			compatMode string
-			code       string
-			expErr     string
-		}{
-			{"InvalidCompat", "es1", `export default function() {};`,
-				`invalid compatibility mode "es1". Use: "es6", "es51"`},
-			// ES6 modules are not supported
-			{"Modules", "es51", `export default function() {};`,
-				"file://script.js: Line 1:1 Unexpected reserved word"},
-			// Arrow functions are not supported
-			{"ArrowFuncs", "es51",
-				`module.exports.default = function() {}; () => {};`,
-				"file://script.js: Line 1:42 Unexpected token ) (and 1 more errors)"},
-		}
-
-		for _, tc := range testCases {
-			tc := tc
-			t.Run(tc.name, func(t *testing.T) {
-				rtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom(tc.compatMode)}
-				arc := getArchive(tc.code, rtOpts)
-				_, err := NewBundleFromArchive(arc, rtOpts)
-				assert.EqualError(t, err, tc.expErr)
-			})
-		}
-	})
 }
 
 func TestOpen(t *testing.T) {
@@ -724,33 +699,62 @@ func TestBundleEnv(t *testing.T) {
 }
 
 func TestBundleMakeArchive(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	_ = fs.MkdirAll("/path/to", 0755)
-	_ = afero.WriteFile(fs, "/path/to/file.txt", []byte(`hi`), 0644)
-	_ = afero.WriteFile(fs, "/path/to/exclaim.js", []byte(`export default function(s) { return s + "!" };`), 0644)
-	data := `
+	t.Run("ok", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		_ = fs.MkdirAll("/path/to", 0755)
+		_ = afero.WriteFile(fs, "/path/to/file.txt", []byte(`hi`), 0644)
+		_ = afero.WriteFile(fs, "/path/to/exclaim.js", []byte(`export default function(s) { return s + "!" };`), 0644)
+		data := `
 			import exclaim from "./exclaim.js";
 			export let options = { vus: 12345 };
 			export let file = open("./file.txt");
 			export default function() { return exclaim(file); };
 		`
-	b, err := getSimpleBundleWithFs("/path/to/script.js", data, fs)
-	assert.NoError(t, err)
+		b, err := getSimpleBundleWithFs("/path/to/script.js", data, fs)
+		assert.NoError(t, err)
 
-	arc := b.makeArchive()
+		arc := b.makeArchive()
 
-	assert.Equal(t, "js", arc.Type)
-	assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, arc.Options)
-	assert.Equal(t, "file:///path/to/script.js", arc.FilenameURL.String())
-	assert.Equal(t, data, string(arc.Data))
-	assert.Equal(t, "file:///path/to/", arc.PwdURL.String())
+		assert.Equal(t, "js", arc.Type)
+		assert.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, arc.Options)
+		assert.Equal(t, "file:///path/to/script.js", arc.FilenameURL.String())
+		assert.Equal(t, data, string(arc.Data))
+		assert.Equal(t, "file:///path/to/", arc.PwdURL.String())
 
-	exclaimData, err := afero.ReadFile(arc.Filesystems["file"], "/path/to/exclaim.js")
-	assert.NoError(t, err)
-	assert.Equal(t, `export default function(s) { return s + "!" };`, string(exclaimData))
+		exclaimData, err := afero.ReadFile(arc.Filesystems["file"], "/path/to/exclaim.js")
+		assert.NoError(t, err)
+		assert.Equal(t, `export default function(s) { return s + "!" };`, string(exclaimData))
 
-	fileData, err := afero.ReadFile(arc.Filesystems["file"], "/path/to/file.txt")
-	assert.NoError(t, err)
-	assert.Equal(t, `hi`, string(fileData))
-	assert.Equal(t, consts.Version, arc.K6Version)
+		fileData, err := afero.ReadFile(arc.Filesystems["file"], "/path/to/file.txt")
+		assert.NoError(t, err)
+		assert.Equal(t, `hi`, string(fileData))
+		assert.Equal(t, consts.Version, arc.K6Version)
+	})
+	t.Run("err", func(t *testing.T) {
+		testCases := []struct {
+			name       string
+			compatMode string
+			code       string
+			expErr     string
+		}{
+			{"InvalidCompat", "es1", `export default function() {};`,
+				`invalid compatibility mode "es1". Use: "es6", "es51"`},
+			// ES6 modules are not supported
+			{"Modules", "es51", `export default function() {};`,
+				"file://script.js: Line 1:1 Unexpected reserved word"},
+			// Arrow functions are not supported
+			{"ArrowFuncs", "es51",
+				`module.exports.default = function() {}; () => {};`,
+				"file://script.js: Line 1:42 Unexpected token ) (and 1 more errors)"},
+		}
+
+		for _, tc := range testCases {
+			tc := tc
+			t.Run(tc.name, func(t *testing.T) {
+				rtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom(tc.compatMode)}
+				_, err := getArchive(tc.code, rtOpts)
+				assert.EqualError(t, err, tc.expErr)
+			})
+		}
+	})
 }
