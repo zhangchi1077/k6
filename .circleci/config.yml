@@ -17,7 +17,8 @@ jobs:
             curl --fail https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
             dep version
             dep status
-            dep ensure -update -dry-run
+            dep ensure |& tee ensure.log
+            test `grep -ci "Warning" ensure.log` -eq 0
 
 
   test:
