@@ -44,6 +44,7 @@ import (
 	"github.com/loadimpact/k6/stats/influxdb"
 	"github.com/loadimpact/k6/stats/kafka"
 	"github.com/loadimpact/k6/stats/statsd/common"
+	"github.com/loadimpact/k6/stats/timescaledb"
 	"github.com/loadimpact/k6/ui"
 )
 
@@ -69,12 +70,13 @@ type Config struct {
 	NoSummary     null.Bool `json:"noSummary" envconfig:"K6_NO_SUMMARY"`
 
 	Collectors struct {
-		InfluxDB influxdb.Config `json:"influxdb"`
-		Kafka    kafka.Config    `json:"kafka"`
-		Cloud    cloud.Config    `json:"cloud"`
-		StatsD   common.Config   `json:"statsd"`
-		Datadog  datadog.Config  `json:"datadog"`
-		CSV      csv.Config      `json:"csv"`
+		InfluxDB    influxdb.Config    `json:"influxdb"`
+		Kafka       kafka.Config       `json:"kafka"`
+		Cloud       cloud.Config       `json:"cloud"`
+		StatsD      common.Config      `json:"statsd"`
+		Datadog     datadog.Config     `json:"datadog"`
+		TimescaleDB timescaledb.Config `json:"timescaledb"`
+		CSV         csv.Config         `json:"csv"`
 	} `json:"collectors"`
 }
 
