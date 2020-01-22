@@ -2,13 +2,11 @@ package executor
 
 import (
 	"context"
-	"math/big"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/loadimpact/k6/lib"
 	"github.com/loadimpact/k6/lib/types"
 	"github.com/loadimpact/k6/stats"
 	"github.com/sirupsen/logrus"
@@ -16,187 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	null "gopkg.in/guregu/null.v3"
 )
-
-func TestGetPlannedRateChanges0DurationStage(t *testing.T) {
-	t.Parallel()
-	var config = VariableArrivalRateConfig{
-		TimeUnit:  types.NullDurationFrom(time.Second),
-		StartRate: null.IntFrom(0),
-		Stages: []Stage{
-			{
-				Duration: types.NullDurationFrom(0),
-				Target:   null.IntFrom(50),
-			},
-			{
-				Duration: types.NullDurationFrom(time.Minute),
-				Target:   null.IntFrom(50),
-			},
-			{
-				Duration: types.NullDurationFrom(0),
-				Target:   null.IntFrom(100),
-			},
-			{
-				Duration: types.NullDurationFrom(time.Minute),
-				Target:   null.IntFrom(100),
-			},
-		},
-	}
-	var es *lib.ExecutionSegment
-	changes := config.getPlannedRateChanges(es)
-	require.Equal(t, 2, len(changes))
-	require.Equal(t, time.Duration(0), changes[0].timeOffset)
-	require.Equal(t, types.NullDurationFrom(time.Millisecond*20), changes[0].tickerPeriod)
-
-	require.Equal(t, time.Minute, changes[1].timeOffset)
-	require.Equal(t, types.NullDurationFrom(time.Millisecond*10), changes[1].tickerPeriod)
-}
-
-// helper function to calculate the expected rate change at a given time
-func calculateTickerPeriod(current, start, duration time.Duration, from, to int64) types.Duration {
-	var coef = big.NewRat(
-		(current - start).Nanoseconds(),
-		duration.Nanoseconds(),
-	)
-
-	var oneRat = new(big.Rat).Mul(big.NewRat(from-to, 1), coef)
-	oneRat = new(big.Rat).Sub(big.NewRat(from, 1), oneRat)
-	oneRat = new(big.Rat).Mul(big.NewRat(int64(time.Second), 1), new(big.Rat).Inv(oneRat))
-	return types.Duration(new(big.Int).Div(oneRat.Num(), oneRat.Denom()).Int64())
-}
-
-func TestGetPlannedRateChangesZeroDurationStart(t *testing.T) {
-	// TODO: Make multiple of those tests
-	t.Parallel()
-	var config = VariableArrivalRateConfig{
-		TimeUnit:  types.NullDurationFrom(time.Second),
-		StartRate: null.IntFrom(0),
-		Stages: []Stage{
-			{
-				Duration: types.NullDurationFrom(0),
-				Target:   null.IntFrom(50),
-			},
-			{
-				Duration: types.NullDurationFrom(time.Minute),
-				Target:   null.IntFrom(50),
-			},
-			{
-				Duration: types.NullDurationFrom(0),
-				Target:   null.IntFrom(100),
-			},
-			{
-				Duration: types.NullDurationFrom(time.Minute),
-				Target:   null.IntFrom(100),
-			},
-			{
-				Duration: types.NullDurationFrom(time.Minute),
-				Target:   null.IntFrom(0),
-			},
-		},
-	}
-
-	var es *lib.ExecutionSegment
-	changes := config.getPlannedRateChanges(es)
-	var expectedTickerPeriod types.Duration
-	for i, change := range changes {
-		switch {
-		case change.timeOffset == 0:
-			expectedTickerPeriod = types.Duration(20 * time.Millisecond)
-		case change.timeOffset == time.Minute*1:
-			expectedTickerPeriod = types.Duration(10 * time.Millisecond)
-		case change.timeOffset < time.Minute*3:
-			expectedTickerPeriod = calculateTickerPeriod(change.timeOffset, 2*time.Minute, time.Minute, 100, 0)
-		case change.timeOffset == time.Minute*3:
-			expectedTickerPeriod = 0
-		default:
-			t.Fatalf("this shouldn't happen %d index %+v", i, change)
-		}
-		require.Equal(t, time.Duration(0),
-			change.timeOffset%minIntervalBetweenRateAdjustments, "%d index %+v", i, change)
-		require.Equal(t, change.tickerPeriod.Duration, expectedTickerPeriod, "%d index %+v", i, change)
-	}
-}
-
-func TestGetPlannedRateChanges(t *testing.T) {
-	// TODO: Make multiple of those tests
-	t.Parallel()
-	var config = VariableArrivalRateConfig{
-		TimeUnit:  types.NullDurationFrom(time.Second),
-		StartRate: null.IntFrom(0),
-		Stages: []Stage{
-			{
-				Duration: types.NullDurationFrom(2 * time.Minute),
-				Target:   null.IntFrom(50),
-			},
-			{
-				Duration: types.NullDurationFrom(time.Minute),
-				Target:   null.IntFrom(50),
-			},
-			{
-				Duration: types.NullDurationFrom(time.Minute),
-				Target:   null.IntFrom(100),
-			},
-			{
-				Duration: types.NullDurationFrom(0),
-				Target:   null.IntFrom(200),
-			},
-
-			{
-				Duration: types.NullDurationFrom(time.Second * 23),
-				Target:   null.IntFrom(50),
-			},
-		},
-	}
-
-	var es *lib.ExecutionSegment
-	changes := config.getPlannedRateChanges(es)
-	var expectedTickerPeriod types.Duration
-	for i, change := range changes {
-		switch {
-		case change.timeOffset <= time.Minute*2:
-			expectedTickerPeriod = calculateTickerPeriod(change.timeOffset, 0, time.Minute*2, 0, 50)
-		case change.timeOffset < time.Minute*4:
-			expectedTickerPeriod = calculateTickerPeriod(change.timeOffset, time.Minute*3, time.Minute, 50, 100)
-		case change.timeOffset == time.Minute*4:
-			expectedTickerPeriod = types.Duration(5 * time.Millisecond)
-		default:
-			expectedTickerPeriod = calculateTickerPeriod(change.timeOffset, 4*time.Minute, 23*time.Second, 200, 50)
-		}
-		require.Equal(t, time.Duration(0),
-			change.timeOffset%minIntervalBetweenRateAdjustments, "%d index %+v", i, change)
-		require.Equal(t, change.tickerPeriod.Duration, expectedTickerPeriod, "%d index %+v", i, change)
-	}
-}
-
-func BenchmarkGetPlannedRateChanges(b *testing.B) {
-	var config = VariableArrivalRateConfig{
-		TimeUnit:  types.NullDurationFrom(time.Second),
-		StartRate: null.IntFrom(0),
-		Stages: []Stage{
-			{
-				Duration: types.NullDurationFrom(5 * time.Minute),
-				Target:   null.IntFrom(5000),
-			},
-			{
-				Duration: types.NullDurationFrom(50 * time.Minute),
-				Target:   null.IntFrom(5000),
-			},
-			{
-				Duration: types.NullDurationFrom(5 * time.Minute),
-				Target:   null.IntFrom(0),
-			},
-		},
-	}
-
-	var es *lib.ExecutionSegment
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			changes := config.getPlannedRateChanges(es)
-
-			require.Equal(b, time.Duration(0),
-				changes[0].timeOffset%minIntervalBetweenRateAdjustments, "%+v", changes[0])
-		}
-	})
-}
 
 func getTestVariableArrivalRateConfig() VariableArrivalRateConfig {
 	return VariableArrivalRateConfig{
@@ -264,17 +81,15 @@ func TestVariableArrivalRateRunCorrectRate(t *testing.T) {
 
 		time.Sleep(time.Second)
 		currentCount = atomic.SwapInt64(&count, 0)
-		require.InDelta(t, 10, currentCount, 1)
+		assert.InDelta(t, 10, currentCount, 1)
 
 		time.Sleep(time.Second)
 		currentCount = atomic.SwapInt64(&count, 0)
-		// this is highly dependant on minIntervalBetweenRateAdjustments
-		// TODO find out why this isn't 30 and fix it
-		require.InDelta(t, 26, currentCount, 2)
+		assert.InDelta(t, 30, currentCount, 2)
 
 		time.Sleep(time.Second)
 		currentCount = atomic.SwapInt64(&count, 0)
-		require.InDelta(t, 50, currentCount, 2)
+		assert.InDelta(t, 50, currentCount, 2)
 	}()
 	var engineOut = make(chan stats.SampleContainer, 1000)
 	err := executor.Run(ctx, engineOut)
@@ -288,7 +103,7 @@ func TestVariableArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 	var count int64
 	var now = time.Now()
 	var expectedTimes = []time.Duration{
-		time.Millisecond * 2500, time.Second * 4, time.Millisecond * 5200}
+		time.Millisecond * 3464, time.Millisecond * 4898, time.Second * 6}
 	var ctx, cancel, executor, logHook = setupExecutor(
 		t, VariableArrivalRateConfig{
 			TimeUnit: types.NullDurationFrom(time.Second),
@@ -296,6 +111,14 @@ func TestVariableArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 				{
 					Duration: types.NullDurationFrom(time.Second * 6),
 					Target:   null.IntFrom(1),
+				},
+				{
+					Duration: types.NullDurationFrom(time.Second * 0),
+					Target:   null.IntFrom(0),
+				},
+				{
+					Duration: types.NullDurationFrom(time.Second * 1),
+					Target:   null.IntFrom(0),
 				},
 			},
 			PreAllocatedVUs: null.IntFrom(10),
@@ -320,6 +143,134 @@ func TestVariableArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 	var engineOut = make(chan stats.SampleContainer, 1000)
 	err := executor.Run(ctx, engineOut)
 	require.NoError(t, err)
-	require.Equal(t, int64(3), count)
+	require.Equal(t, int64(len(expectedTimes)), count)
 	require.Empty(t, logHook.Drain())
+}
+
+func TestVariableArrivalRateCal(t *testing.T) {
+	t.Parallel()
+
+	var expectedTimes = []time.Duration{
+		time.Millisecond * 3162, time.Millisecond * 4472, time.Millisecond * 5527, time.Millisecond * 6837, time.Second * 10}
+	var config = VariableArrivalRateConfig{
+		TimeUnit:  types.NullDurationFrom(time.Second),
+		StartRate: null.IntFrom(0),
+		Stages: []Stage{
+			{
+				Duration: types.NullDurationFrom(time.Second * 5),
+				Target:   null.IntFrom(1),
+			},
+			{
+				Duration: types.NullDurationFrom(time.Second * 5),
+				Target:   null.IntFrom(0),
+			},
+		},
+	}
+
+	var ch = make(chan time.Duration, 20)
+	config.cal(ch)
+	var changes = make([]time.Duration, 0, len(expectedTimes))
+	for c := range ch {
+		changes = append(changes, c)
+	}
+	assert.Equal(t, len(expectedTimes), len(changes))
+	for i, expectedTime := range expectedTimes {
+		change := changes[i]
+		assert.InEpsilon(t, expectedTime, change, 0.001, "%s %s", expectedTime, change)
+	}
+}
+
+func TestVariableArrivalRateCal2(t *testing.T) {
+	t.Parallel()
+
+	var expectedTimes = []time.Duration{
+		time.Millisecond * 3162, time.Millisecond * 4472, time.Millisecond * 5500}
+	var config = VariableArrivalRateConfig{
+		TimeUnit:  types.NullDurationFrom(time.Second),
+		StartRate: null.IntFrom(0),
+		Stages: []Stage{
+			{
+				Duration: types.NullDurationFrom(time.Second * 5),
+				Target:   null.IntFrom(1),
+			},
+			{
+				Duration: types.NullDurationFrom(time.Second * 1),
+				Target:   null.IntFrom(1),
+			},
+		},
+	}
+
+	var ch = make(chan time.Duration, 20)
+	config.cal(ch)
+	var changes = make([]time.Duration, 0, len(expectedTimes))
+	for c := range ch {
+		changes = append(changes, c)
+	}
+	assert.Equal(t, len(expectedTimes), len(changes))
+	for i, expectedTime := range expectedTimes {
+		change := changes[i]
+		assert.InEpsilon(t, expectedTime, change, 0.001, "%s %s", expectedTime, change)
+	}
+}
+
+func BenchmarkCal(b *testing.B) {
+	for _, t := range []time.Duration{
+		time.Second, time.Minute,
+	} {
+		t := t
+		b.Run(t.String(), func(b *testing.B) {
+			var config = VariableArrivalRateConfig{
+				TimeUnit:  types.NullDurationFrom(time.Second),
+				StartRate: null.IntFrom(500000),
+				Stages: []Stage{
+					{
+						Duration: types.NullDurationFrom(t),
+						Target:   null.IntFrom(499999),
+					},
+					{
+						Duration: types.NullDurationFrom(t),
+						Target:   null.IntFrom(500000),
+					},
+				},
+			}
+
+			b.ResetTimer()
+			b.RunParallel(func(pb *testing.PB) {
+				for pb.Next() {
+					var ch = make(chan time.Duration, 20)
+					go config.cal(ch)
+					for c := range ch {
+						_ = c
+					}
+				}
+			})
+		})
+	}
+}
+
+func BenchmarkCalRat(b *testing.B) {
+	var config = VariableArrivalRateConfig{
+		TimeUnit:  types.NullDurationFrom(time.Second),
+		StartRate: null.IntFrom(0),
+		Stages: []Stage{
+			{
+				Duration: types.NullDurationFrom(30 * time.Second),
+				Target:   null.IntFrom(200),
+			},
+			{
+				Duration: types.NullDurationFrom(1 * time.Minute),
+				Target:   null.IntFrom(200),
+			},
+		},
+	}
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			var ch = make(chan time.Duration, 20)
+			go config.calRat(ch)
+			for c := range ch {
+				_ = c
+			}
+		}
+	})
 }
