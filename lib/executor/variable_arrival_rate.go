@@ -427,6 +427,7 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 	var timer = time.NewTimer(time.Hour)
 	var start = time.Now()
 	var ch = make(chan time.Duration, 0)
+	var prevTime time.Duration
 	go varr.config.cal(ch)
 	for {
 		select {
@@ -434,11 +435,10 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 			if !ok {
 				return nil
 			}
+			atomic.StoreInt64(tickerPeriod, int64(nextTime-prevTime))
+			prevTime = nextTime
 			b := time.Until(start.Add(nextTime))
-			// fmt.Println(b)
-			atomic.StoreInt64(tickerPeriod, int64(b))
 			if b < 0 {
-				// fmt.Println(time.Now())
 				err := startIteration()
 				if err != nil {
 					return err
@@ -448,7 +448,6 @@ func (varr VariableArrivalRate) Run(ctx context.Context, out chan<- stats.Sample
 			timer.Reset(b)
 			select {
 			case <-timer.C:
-				// fmt.Println(time.Now())
 				err := startIteration()
 				if err != nil {
 					return err
