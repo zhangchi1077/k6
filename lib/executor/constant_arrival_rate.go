@@ -24,6 +24,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -236,7 +237,18 @@ func (car ConstantArrivalRate) Run(ctx context.Context, out chan<- stats.SampleC
 			currentInitialisedVUs-vusInBuffer, currentInitialisedVUs)
 		progIters := fmt.Sprintf(
 			pb.GetFixedLengthFloatFormat(arrivalRatePerSec, 0)+" iters/s", arrivalRatePerSec)
-		return math.Min(1, float64(spent)/float64(duration)), []string{progVUs, progIters}
+
+		right := []string{progVUs, duration.String(), progIters}
+
+		if spent > duration {
+			return 1, right
+		}
+
+		spentDuration := pb.GetFixedLengthDuration(spent, duration)
+		progDur := fmt.Sprintf("%s/%s", strings.Replace(spentDuration, "s", "", 1), duration)
+		right[1] = progDur
+
+		return math.Min(1, float64(spent)/float64(duration)), right
 	}
 	car.progress.Modify(pb.WithProgress(progresFn))
 	go trackProgress(ctx, maxDurationCtx, regDurationCtx, car, progresFn)
