@@ -151,21 +151,30 @@ func (c *Collector) pushMetrics() {
 		return
 	}
 
-	// Send the samples
+// Send the samples
 	logrus.Debug("Kafka: Delivering...")
 
+	var msgList []*sarama.ProducerMessage
 	for _, sample := range formattedSamples {
+		//logrus.Info("sample : ================>>>" + sample)
 		msg := &sarama.ProducerMessage{Topic: c.Config.Topic.String, Value: sarama.StringEncoder(sample)}
-		partition, offset, err := c.Producer.SendMessage(msg)
-		if err != nil {
-			logrus.WithError(err).Error("Kafka: failed to send message.")
-		} else {
-			logrus.WithFields(logrus.Fields{
-				"partition": partition,
-				"offset":    offset,
-			}).Debug("Kafka: message sent.")
-		}
+		msgList = append(msgList, msg)
+
+		//eachStartTime := time.Now()
+		//partition, offset, err := c.Producer.SendMessage(msg)
+		//t2 := time.Since(eachStartTime)
+		// logrus.WithField("t", t2).Debug("Kafka: each time!!!!!")
+		// if err != nil {
+		// 	logrus.WithError(err).Error("Kafka: failed to send message.")
+		// } else {
+		// 	logrus.WithFields(logrus.Fields{
+		// 		"partition": partition,
+		// 		"offset":    offset,
+		// 	}).Debug("Kafka: message sent.")
+		// }
 	}
+
+	c.Producer.SendMessages(msgList)
 
 	t := time.Since(startTime)
 	logrus.WithField("t", t).Debug("Kafka: Delivered!")
